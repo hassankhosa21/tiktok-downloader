@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment variables
+backend/.env
+.env
+
+# Database files
+backend/hassan_labs.json
+backend/*.db
+backend/*.db-journal
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
