@@ -1,5 +1,8 @@
 // frontend/script.js
-const API_BASE_URL = 'http://localhost:5001';
+// ✅ AUTO-DETECT API BASE URL (Works on localhost AND Railway)
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000'
+    : ''; // Empty = use same origin (works on Railway)
 
 // ======================================================
 // PAGE ELEMENTS
