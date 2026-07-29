@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hassan Labs - TikTok Downloader</title>
     <link rel="stylesheet" href="style.css">
-    <!-- CHANGE THIS: YOUR_LOGO_FILENAME_HERE -->
-    <link rel="icon" href="logo.png.png" type="image/png">
+    <!-- ✅ Using correct logo filename -->
+    <link rel="icon" href="logo.png" type="image/png">
 </head>
 <body>
     <div class="app-container">
@@ -18,8 +18,7 @@
         <div id="authPage" class="auth-page">
             <div class="auth-wrapper">
                 <div class="auth-brand">
-                    <!-- CHANGE THIS: YOUR_LOGO_FILENAME_HERE -->
-                    <img src="logo.png.png" alt="Hassan Labs" class="auth-logo">
+                    <img src="logo.png" alt="Hassan Labs" class="auth-logo">
                     <h1>Hassan <span>Labs</span></h1>
                     <p>AI Powered Video Toolkit</p>
                 </div>
@@ -28,8 +27,13 @@
                 <div id="loginForm" class="auth-form">
                     <h2>🔑 Login</h2>
                     <p class="auth-subtitle">Welcome back!</p>
+                    <!-- ✅ Added hidden label for accessibility -->
+                    <label for="loginEmail" class="sr-only">Email address</label>
                     <input type="email" id="loginEmail" placeholder="Email address" class="auth-input">
+                    
+                    <label for="loginPassword" class="sr-only">Password</label>
                     <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
+                    
                     <div id="loginError" class="auth-error hidden"></div>
                     <button id="loginSubmitBtn" class="primary-btn auth-submit">Login</button>
                     <p class="auth-switch">Don't have an account? <span id="switchToRegister" class="auth-link">Register</span></p>
@@ -39,8 +43,13 @@
                 <div id="registerForm" class="auth-form hidden">
                     <h2>📝 Register</h2>
                     <p class="auth-subtitle">Create your account</p>
+                    
+                    <label for="registerEmail" class="sr-only">Email address</label>
                     <input type="email" id="registerEmail" placeholder="Email address" class="auth-input">
+                    
+                    <label for="registerPassword" class="sr-only">Password</label>
                     <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" class="auth-input">
+                    
                     <div id="registerError" class="auth-error hidden"></div>
                     <button id="registerSubmitBtn" class="primary-btn auth-submit">Register</button>
                     <p class="auth-switch">Already have an account? <span id="switchToLogin" class="auth-link">Login</span></p>
@@ -58,8 +67,7 @@
                 <aside class="sidebar">
                     <div class="brand">
                         <div class="brand-logo">
-                            <!-- CHANGE THIS: YOUR_LOGO_FILENAME_HERE -->
-                            <img src="logo.png.png" alt="Hassan Labs" class="brand-image">
+                            <img src="logo.png" alt="Hassan Labs" class="brand-image">
                         </div>
                     </div>
                     
@@ -103,6 +111,7 @@
                         <div class="input-card">
                             <h3>🎬 TikTok Video Downloader</h3>
                             <div class="input-row">
+                                <label for="videoUrl" class="sr-only">TikTok video URL</label>
                                 <input type="text" id="videoUrl" placeholder="Paste TikTok video URL here...">
                                 <button id="downloadBtn" class="primary-btn">Download</button>
                             </div>

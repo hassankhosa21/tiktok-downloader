@@ -1,0 +1,25 @@
+﻿app = "hassan-labs-tiktok"
+primary_region = "fra"
+
+[build]
+  [build.args]
+    NODE_VERSION = "18"
+
+[env]
+  PORT = "5000"
+
+[[services]]
+  internal_port = 5000
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
