@@ -1,6 +1,5 @@
 ﻿FROM node:18-slim
-USER node
-WORKDIR /home/node/app
+WORKDIR /app
 COPY backend/package*.json ./
 RUN npm install
 COPY backend/ ./

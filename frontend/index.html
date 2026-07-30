@@ -1,223 +1,126 @@
-<!-- frontend/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hassan Labs - TikTok Downloader</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- ✅ Using correct logo filename -->
-    <link rel="icon" href="logo.png.png" type="image/png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hassan Labs - TikTok Downloader</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="logo.png" type="image/png">
 </head>
 <body>
-    <div class="app-container">
-
-        <!-- ========================================== -->
-        <!-- PAGE 1: AUTH (Full Page - NO SIDEBAR)      -->
-        <!-- ========================================== -->
-        <div id="authPage" class="auth-page">
-            <div class="auth-wrapper">
-                <div class="auth-brand">
-                    <img src="logo.png.png" alt="Hassan Labs" class="auth-logo">
-                    <h1>Hassan <span>Labs</span></h1>
-                    <p>AI Powered Video Toolkit</p>
-                </div>
-
-                <!-- Login Form -->
-                <div id="loginForm" class="auth-form">
-                    <h2>🔑 Login</h2>
-                    <p class="auth-subtitle">Welcome back!</p>
-                    <!-- ✅ Added hidden label for accessibility -->
-                    <label for="loginEmail" class="sr-only">Email address</label>
-                    <input type="email" id="loginEmail" placeholder="Email address" class="auth-input">
-                    
-                    <label for="loginPassword" class="sr-only">Password</label>
-                    <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
-                    
-                    <div id="loginError" class="auth-error hidden"></div>
-                    <button id="loginSubmitBtn" class="primary-btn auth-submit">Login</button>
-                    <p class="auth-switch">Don't have an account? <span id="switchToRegister" class="auth-link">Register</span></p>
-                </div>
-
-                <!-- Register Form -->
-                <div id="registerForm" class="auth-form hidden">
-                    <h2>📝 Register</h2>
-                    <p class="auth-subtitle">Create your account</p>
-                    
-                    <label for="registerEmail" class="sr-only">Email address</label>
-                    <input type="email" id="registerEmail" placeholder="Email address" class="auth-input">
-                    
-                    <label for="registerPassword" class="sr-only">Password</label>
-                    <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" class="auth-input">
-                    
-                    <div id="registerError" class="auth-error hidden"></div>
-                    <button id="registerSubmitBtn" class="primary-btn auth-submit">Register</button>
-                    <p class="auth-switch">Already have an account? <span id="switchToLogin" class="auth-link">Login</span></p>
-                </div>
-            </div>
+  <div id="app">
+    <!-- AUTH PAGE -->
+    <div id="authPage" class="auth-page">
+      <div class="auth-wrapper">
+        <div class="auth-brand">
+          <img src="logo.png" alt="Hassan Labs" class="auth-logo">
+          <h1>Hassan <span>Labs</span></h1>
+          <p>AI Powered Video Toolkit</p>
         </div>
-
-        <!-- ========================================== -->
-        <!-- PAGE 2: DASHBOARD (With Sidebar)           -->
-        <!-- ========================================== -->
-        <div id="dashboardPage" class="dashboard-page hidden">
-            <div class="dashboard-container">
-
-                <!-- Sidebar -->
-                <aside class="sidebar">
-                    <div class="brand">
-                        <div class="brand-logo">
-                            <img src="logo.png.png" alt="Hassan Labs" class="brand-image">
-                        </div>
-                    </div>
-                    
-                    <nav>
-                        <ul>
-                            <li class="active" data-target="downloader">
-                                <a href="#downloader">📥 Downloader</a>
-                            </li>
-                            <li data-target="developer">
-                                <a href="#developer">👨‍💻 Developer</a>
-                            </li>
-                            <li data-target="coming-next">
-                                <a href="#coming-next">🚀 Coming Next</a>
-                            </li>
-                        </ul>
-                    </nav>
-                    
-                    <div class="sidebar-footer">
-                        <div class="user-info">
-                            <p id="loggedInUser" class="username-display">👤 <span id="userEmailDisplay">user@email.com</span></p>
-                            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
-                        </div>
-                    </div>
-                </aside>
-
-                <!-- Main Content -->
-                <main class="main-content">
-
-                    <!-- DOWNLOADER SECTION -->
-                    <section id="downloader" class="content-section">
-                        <header class="content-header">
-                            <div>
-                                <h1>Dashboard</h1>
-                                <p class="welcome-text">Welcome back, <strong id="welcomeEmail">User</strong>!</p>
-                            </div>
-                            <div class="header-actions">
-                                <span class="status-badge">● Active</span>
-                            </div>
-                        </header>
-
-                        <div class="input-card">
-                            <h3>🎬 TikTok Video Downloader</h3>
-                            <div class="input-row">
-                                <label for="videoUrl" class="sr-only">TikTok video URL</label>
-                                <input type="text" id="videoUrl" placeholder="Paste TikTok video URL here...">
-                                <button id="downloadBtn" class="primary-btn">Download</button>
-                            </div>
-                            <p class="hint">Example: https://www.tiktok.com/@username/video/123456789</p>
-                        </div>
-
-                        <div id="loading" class="loading hidden">
-                            <div class="spinner"></div>
-                            <p>Fetching your video...</p>
-                        </div>
-
-                        <div id="result" class="result-card hidden">
-                            <div class="video-grid">
-                                <div class="video-preview">
-                                    <video id="videoPreview" controls></video>
-                                </div>
-                                <div class="video-meta">
-                                    <h2 id="videoCaption">Video Title</h2>
-                                    <div class="meta-grid">
-                                        <div class="meta-item">
-                                            <span class="meta-label">Channel</span>
-                                            <span class="meta-value" id="videoAuthor">Unknown</span>
-                                        </div>
-                                        <div class="meta-item">
-                                            <span class="meta-label">Duration</span>
-                                            <span class="meta-value" id="videoDuration">0:00</span>
-                                        </div>
-                                        <div class="meta-item">
-                                            <span class="meta-label">Views</span>
-                                            <span class="meta-value" id="viewsCount">0</span>
-                                        </div>
-                                        <div class="meta-item">
-                                            <span class="meta-label">Upload Date</span>
-                                            <span class="meta-value" id="uploadDate">Unknown</span>
-                                        </div>
-                                    </div>
-                                    <div class="quality-section">
-                                        <label for="qualitySelect">Select Video Quality</label>
-                                        <select id="qualitySelect">
-                                            <option value="hd">HD (High Quality)</option>
-                                            <option value="sd">SD (Standard)</option>
-                                        </select>
-                                    </div>
-                                    <a id="downloadLink" class="download-btn" download>⬇️ Download Video</a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="error" class="error-message hidden">
-                            <span>⚠️</span>
-                            <span id="errorText">Something went wrong</span>
-                        </div>
-                    </section>
-
-                    <!-- DEVELOPER SECTION -->
-                    <section id="developer" class="content-section coming-next">
-                        <h3>👨‍💻 Developer</h3>
-                        <p class="coming-desc">
-                            Built by <strong>Hassan</strong> — This TikTok Downloader is part of the <strong>Hassan Labs</strong> ecosystem. 
-                            <br>Powered by Node.js, Express, LowDB, and the Omkar Cloud API.
-                        </p>
-                        <div class="feature-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
-                            <div class="feature-card"><span class="feature-icon">🛠️</span><h4>Version</h4><p>2.0.0</p></div>
-                            <div class="feature-card"><span class="feature-icon">📅</span><h4>Released</h4><p>2026</p></div>
-                            <div class="feature-card"><span class="feature-icon">🗄️</span><h4>Database</h4><p>LowDB</p></div>
-                            <div class="feature-card"><span class="feature-icon">🔒</span><h4>Secure</h4><p>bcrypt + Sessions</p></div>
-                        </div>
-                    </section>
-
-                    <!-- COMING NEXT SECTION -->
-                    <section id="coming-next" class="content-section coming-next">
-                        <h3>🚀 What's Coming Next</h3>
-                        <p class="coming-desc">Hassan Labs is growing into an all-in-one media downloader. Here are some exciting tools coming in future updates.</p>
-                        <div class="feature-grid">
-                            <div class="feature-card">
-                                <span class="feature-icon">📺</span>
-                                <h4>YouTube Downloader</h4>
-                                <p>Already live!</p>
-                            </div>
-                            <div class="feature-card">
-                                <span class="feature-icon">🎵</span>
-                                <h4>TikTok Downloader</h4>
-                                <p>Currently active</p>
-                            </div>
-                            <div class="feature-card">
-                                <span class="feature-icon">📸</span>
-                                <h4>Instagram Reels</h4>
-                                <p>Coming soon</p>
-                            </div>
-                            <div class="feature-card">
-                                <span class="feature-icon">🎶</span>
-                                <h4>Spotify Playlist</h4>
-                                <p>Future update</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <footer>
-                        <p>© 2026 <strong>Hassan Labs</strong> — Built with ❤️ for the community</p>
-                    </footer>
-                </main>
-            </div>
+        <div id="loginForm" class="auth-form">
+          <h2>🔑 Login</h2>
+          <p class="auth-subtitle">Welcome back!</p>
+          <input type="email" id="loginEmail" placeholder="Email address" class="auth-input">
+          <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
+          <div id="loginError" class="auth-error hidden"></div>
+          <button id="loginSubmitBtn" class="primary-btn auth-submit">Login</button>
+          <p class="auth-switch">Don't have an account? <span id="switchToRegister" class="auth-link">Register</span></p>
         </div>
-
+        <div id="registerForm" class="auth-form hidden">
+          <h2>📝 Register</h2>
+          <p class="auth-subtitle">Create your account</p>
+          <input type="email" id="registerEmail" placeholder="Email address" class="auth-input">
+          <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" class="auth-input">
+          <div id="registerError" class="auth-error hidden"></div>
+          <button id="registerSubmitBtn" class="primary-btn auth-submit">Register</button>
+          <p class="auth-switch">Already have an account? <span id="switchToLogin" class="auth-link">Login</span></p>
+        </div>
+      </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- DASHBOARD -->
+    <div id="dashboardPage" class="dashboard-page hidden">
+      <div class="dashboard-container">
+        <aside class="sidebar">
+          <div class="brand"><div class="brand-logo"><img src="logo.png" alt="Hassan Labs" class="brand-image"></div></div>
+          <nav>
+            <ul>
+              <li class="active" data-target="downloader"><a href="#downloader">📥 Downloader</a></li>
+              <li data-target="developer"><a href="#developer">👨‍💻 Developer</a></li>
+              <li data-target="coming-next"><a href="#coming-next">🚀 Coming Next</a></li>
+            </ul>
+          </nav>
+          <div class="sidebar-footer">
+            <div class="user-info">
+              <p class="username-display">👤 <span id="userEmailDisplay">user@email.com</span></p>
+              <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+            </div>
+          </div>
+        </aside>
+        <main class="main-content">
+          <section id="downloader" class="content-section">
+            <header class="content-header">
+              <div>
+                <h1>Dashboard</h1>
+                <p class="welcome-text">Welcome back, <strong id="welcomeEmail">User</strong>!</p>
+              </div>
+              <div class="header-actions"><span class="status-badge">● Active</span></div>
+            </header>
+            <div class="input-card">
+              <h3>🎬 TikTok Video Downloader</h3>
+              <div class="input-row">
+                <input type="text" id="videoUrl" placeholder="Paste TikTok video URL here...">
+                <button id="downloadBtn" class="primary-btn">Download</button>
+              </div>
+              <p class="hint">Example: https://www.tiktok.com/@username/video/123456789</p>
+            </div>
+            <div id="loading" class="loading hidden"><div class="spinner"></div><p>Fetching your video...</p></div>
+            <div id="result" class="result-card hidden">
+              <div class="video-grid">
+                <div class="video-preview"><video id="videoPreview" controls></video></div>
+                <div class="video-meta">
+                  <h2 id="videoCaption">Video Title</h2>
+                  <div class="meta-grid">
+                    <div class="meta-item"><span class="meta-label">Channel</span><span class="meta-value" id="videoAuthor">Unknown</span></div>
+                    <div class="meta-item"><span class="meta-label">Duration</span><span class="meta-value" id="videoDuration">0:00</span></div>
+                    <div class="meta-item"><span class="meta-label">Views</span><span class="meta-value" id="viewsCount">0</span></div>
+                    <div class="meta-item"><span class="meta-label">Upload Date</span><span class="meta-value" id="uploadDate">Unknown</span></div>
+                  </div>
+                  <div class="quality-section">
+                    <label for="qualitySelect">Select Video Quality</label>
+                    <select id="qualitySelect"><option value="hd">HD (High Quality)</option><option value="sd">SD (Standard)</option></select>
+                  </div>
+                  <a id="downloadLink" class="download-btn" download>⬇️ Download Video</a>
+                </div>
+              </div>
+            </div>
+            <div id="error" class="error-message hidden"><span>⚠️</span><span id="errorText">Something went wrong</span></div>
+          </section>
+          <section id="developer" class="content-section coming-next">
+            <h3>👨‍💻 Developer</h3>
+            <p class="coming-desc">Built by <strong>Hassan</strong> — This TikTok Downloader is part of the <strong>Hassan Labs</strong> ecosystem. Powered by Node.js, Express, MongoDB, and the Omkar Cloud API.</p>
+            <div class="feature-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+              <div class="feature-card"><span class="feature-icon">🛠️</span><h4>Version</h4><p>2.0.0</p></div>
+              <div class="feature-card"><span class="feature-icon">📅</span><h4>Released</h4><p>2026</p></div>
+              <div class="feature-card"><span class="feature-icon">🗄️</span><h4>Database</h4><p>MongoDB</p></div>
+              <div class="feature-card"><span class="feature-icon">🔒</span><h4>Secure</h4><p>bcrypt + Sessions</p></div>
+            </div>
+          </section>
+          <section id="coming-next" class="content-section coming-next">
+            <h3>🚀 What's Coming Next</h3>
+            <p class="coming-desc">Hassan Labs is growing into an all-in-one media downloader. Here are some exciting tools coming in future updates.</p>
+            <div class="feature-grid">
+              <div class="feature-card"><span class="feature-icon">📺</span><h4>YouTube Downloader</h4><p>Already live!</p></div>
+              <div class="feature-card"><span class="feature-icon">🎵</span><h4>TikTok Downloader</h4><p>Currently active</p></div>
+              <div class="feature-card"><span class="feature-icon">📸</span><h4>Instagram Reels</h4><p>Coming soon</p></div>
+              <div class="feature-card"><span class="feature-icon">🎶</span><h4>Spotify Playlist</h4><p>Future update</p></div>
+            </div>
+          </section>
+          <footer><p>© 2026 <strong>Hassan Labs</strong> — Built with ❤️ for the community</p></footer>
+        </main>
+      </div>
+    </div>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>
