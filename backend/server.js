@@ -106,7 +106,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API (TikWM Only – No API Key Needed)
+// DOWNLOAD API (TikWM with User-Agent)
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -119,13 +119,22 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
     }
 
     console.log('📥 Downloading:', url);
-    const response = await axios.get('https://api.tikwm.com/video/', {
+
+    // Try TikWM API with proper headers
+    const response = await axios.get('https://www.tikwm.com/api/', {
       params: { 
         url: url,
         hd: 1,
         web: 1
       },
-      timeout: 20000
+      timeout: 20000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.tikwm.com/',
+        'Origin': 'https://www.tikwm.com'
+      }
     });
 
     const data = response?.data?.data;
@@ -136,16 +145,25 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
     const dur = data.duration || 0;
     const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
 
+    // Format upload date if it's a timestamp
+    let uploadDate = data.create_time || 'Unknown';
+    if (typeof uploadDate === 'number' || !isNaN(uploadDate)) {
+      const date = new Date(Number(uploadDate) * 1000);
+      if (!isNaN(date.getTime())) {
+        uploadDate = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+      }
+    }
+
     res.json({
       success: true,
       video: {
         id: data.video_id || '',
         caption: data.title || 'No caption',
-        author: data.author?.unique_id || 'Unknown',
+        author: data.author?.unique_id || data.author?.nickname || 'Unknown',
         hdUrl: data.hd_video_url || data.video_url || '',
         sdUrl: data.video_url || data.hd_video_url || '',
         duration: duration,
-        uploadDate: data.create_time || 'Unknown',
+        uploadDate: uploadDate,
         stats: {
           views: data.views || 0,
           likes: data.digg_count || 0,
@@ -157,10 +175,59 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
 
   } catch (error) {
     console.error('Download error:', error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to download video. Please try again.' 
-    });
+    
+    // Try fallback API (snaptik)
+    try {
+      console.log('🔄 Trying fallback API (Snaptik)...');
+      
+      const fallbackResponse = await axios.get('https://snaptik.app/api/ajaxSearch', {
+        params: { 
+          q: req.query.url,
+          lang: 'en'
+        },
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://snaptik.app/',
+          'Origin': 'https://snaptik.app'
+        }
+      });
+
+      const fallbackData = fallbackResponse?.data?.data;
+      if (!fallbackData || !fallbackData.video_url) {
+        throw new Error('No data from fallback API');
+      }
+
+      const dur2 = fallbackData.duration || 0;
+      const duration2 = `${Math.floor(dur2 / 60)}:${String(dur2 % 60).padStart(2, '0')}`;
+
+      res.json({
+        success: true,
+        video: {
+          id: fallbackData.video_id || '',
+          caption: fallbackData.title || 'No caption',
+          author: fallbackData.author || 'Unknown',
+          hdUrl: fallbackData.video_url || '',
+          sdUrl: fallbackData.video_url || '',
+          duration: duration2,
+          uploadDate: fallbackData.create_time || 'Unknown',
+          stats: {
+            views: fallbackData.views || 0,
+            likes: fallbackData.likes || 0,
+            comments: fallbackData.comments || 0,
+            shares: fallbackData.shares || 0
+          }
+        }
+      });
+
+    } catch (fallbackError) {
+      console.error('Fallback API failed:', fallbackError.message);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to download video. Please try again.' 
+      });
+    }
   }
 });
 
