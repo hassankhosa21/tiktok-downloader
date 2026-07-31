@@ -3,11 +3,16 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const path = require('node:path');
 const { initializeDatabase, createUser, verifyUser } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Railway sits in front of your app behind a proxy that terminates HTTPS.
+// Without this, secure cookies won't be set/read correctly in production.
+app.set('trust proxy', 1);
 
 app.disable('x-powered-by');
 app.use(cors({ origin: true, credentials: true }));
@@ -18,6 +23,9 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
   saveUninitialized: false,
+  // Uses MongoDB to store sessions instead of the default in-memory store,
+  // which leaks memory and doesn't work reliably in production.
+  store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
   cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
 }));
 
@@ -115,4 +123,4 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT} in ${process.env.NODE_ENV}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server running on port ${PORT} in ${process.env.NODE_ENV}`));
