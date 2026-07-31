@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const session = require('express-session');
-const MongoStore = require('connect-mongo')(session);
 const path = require('node:path');
 const { initializeDatabase, createUser, verifyUser } = require('./database');
 
@@ -18,17 +17,11 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// ✅ FIXED: MongoDB session store
-const mongoUrl = process.env.MONGODB_URI;
+// ✅ Simple memory store (works fine for free tier)
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
   saveUninitialized: false,
-  store: new MongoStore({ 
-    mongoUrl: mongoUrl,
-    collectionName: 'sessions',
-    ttl: 24 * 60 * 60 // 1 day
-  }),
   cookie: { 
     secure: process.env.NODE_ENV === 'production', 
     httpOnly: true,
@@ -167,7 +160,7 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Download error:', error.message);
+    console.error('Download error (Omkar API):', error.message);
     
     // Try fallback API (TikWM)
     try {
