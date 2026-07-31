@@ -102,7 +102,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API (Using TikTok oEmbed + APIs)
+// DOWNLOAD API (FIXED - Proper Video URL)
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -116,68 +116,39 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
 
     console.log('📥 Downloading:', url);
 
-    // =====================
-    // Try TikTok oEmbed API (Official - No Blocking)
-    // =====================
+    // ========================================
+    // API 1: Snaptik (Best for video download)
+    // ========================================
     try {
-      console.log('🔄 Trying TikTok oEmbed...');
-      const response = await axios.get('https://www.tiktok.com/oembed', {
-        params: { url: url },
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      const data = response?.data;
-      if (data && data.thumbnail_url) {
-        console.log('✅ TikTok oEmbed success!');
-        return res.json({
-          success: true,
-          video: {
-            id: Date.now().toString(),
-            caption: data.title || 'No caption',
-            author: data.author_name || 'Unknown',
-            hdUrl: data.thumbnail_url || '',
-            sdUrl: data.thumbnail_url || '',
-            duration: '0:00',
-            uploadDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
-            stats: {
-              views: 0,
-              likes: 0,
-              comments: 0,
-              shares: 0
-            }
-          }
-        });
-      }
-    } catch (e) {
-      console.log('❌ TikTok oEmbed failed:', e.message);
-    }
-
-    // =====================
-    // Try Snaptik (with different endpoint)
-    // =====================
-    try {
-      console.log('🔄 Trying Snaptik (alternative)...');
+      console.log('🔄 Trying Snaptik...');
       const response = await axios.get('https://snaptik.app/api/ajaxSearch', {
-        params: { 
-          q: url, 
-          lang: 'en',
-          platform: 'tiktok'
-        },
-        timeout: 20000,
+        params: { q: url, lang: 'en' },
+        timeout: 25000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
           'Referer': 'https://snaptik.app/',
           'Origin': 'https://snaptik.app'
         }
       });
 
       const data = response?.data?.data;
-      if (data && data.video_url) {
-        console.log('✅ Snaptik success!');
+      
+      // ✅ Check for video_url in multiple possible locations
+      let videoUrl = null;
+      if (data) {
+        videoUrl = data.video_url || data.video || data.download_url || data.hd_video_url || data.sd_video_url;
+        // Also check nested objects
+        if (!videoUrl && data.media) {
+          videoUrl = data.media.video_url || data.media.hd_video_url || data.media.sd_video_url;
+        }
+        if (!videoUrl && data.video) {
+          videoUrl = data.video.video_url || data.video.hd_video_url || data.video.sd_video_url;
+        }
+      }
+
+      if (videoUrl) {
+        console.log('✅ Snaptik success! Video URL found:', videoUrl.substring(0, 50) + '...');
         const dur = data.duration || 0;
         const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
         return res.json({
@@ -186,8 +157,8 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
             id: data.video_id || Date.now().toString(),
             caption: data.title || 'No caption',
             author: data.author || 'Unknown',
-            hdUrl: data.video_url || '',
-            sdUrl: data.video_url || '',
+            hdUrl: videoUrl,
+            sdUrl: videoUrl,
             duration: duration,
             uploadDate: data.create_time || 'Unknown',
             stats: {
@@ -203,19 +174,13 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
       console.log('❌ Snaptik failed:', e.message);
     }
 
-    // =====================
-    // Try TikWM (with different endpoint)
-    // =====================
+    // ========================================
+    // API 2: TikWM (Backup)
+    // ========================================
     try {
-      console.log('🔄 Trying TikWM (alternative)...');
+      console.log('🔄 Trying TikWM...');
       const response = await axios.get('https://www.tikwm.com/api/', {
-        params: { 
-          url: url, 
-          hd: 1, 
-          web: 1,
-          count: 12,
-          cursor: 0
-        },
+        params: { url: url, hd: 1, web: 1 },
         timeout: 20000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -226,8 +191,16 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
       });
 
       const data = response?.data?.data;
-      if (data && (data.hd_video_url || data.video_url)) {
-        console.log('✅ TikWM success!');
+      let videoUrl = null;
+      if (data) {
+        videoUrl = data.hd_video_url || data.video_url || data.download_url || data.play_url;
+        if (!videoUrl && data.video) {
+          videoUrl = data.video.hd_video_url || data.video.video_url || data.video.play_url;
+        }
+      }
+
+      if (videoUrl) {
+        console.log('✅ TikWM success! Video URL found:', videoUrl.substring(0, 50) + '...');
         const dur = data.duration || 0;
         const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
         let uploadDate = data.create_time || 'Unknown';
@@ -241,8 +214,8 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
             id: data.video_id || Date.now().toString(),
             caption: data.title || 'No caption',
             author: data.author?.unique_id || data.author || 'Unknown',
-            hdUrl: data.hd_video_url || data.video_url || '',
-            sdUrl: data.video_url || data.hd_video_url || '',
+            hdUrl: videoUrl,
+            sdUrl: data.video_url || videoUrl,
             duration: duration,
             uploadDate: uploadDate,
             stats: {
@@ -258,15 +231,99 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
       console.log('❌ TikWM failed:', e.message);
     }
 
-    // =====================
-    // Final fallback: Return a message with the video link
-    // =====================
-    console.log('❌ All APIs failed. Returning fallback.');
+    // ========================================
+    // API 3: TikTok Downloader (Alternative)
+    // ========================================
+    try {
+      console.log('🔄 Trying TikDownload...');
+      const response = await axios.get('https://tikdownload.com/action.php', {
+        params: { url: url, ajax: 1 },
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://tikdownload.com/'
+        }
+      });
+
+      const data = response?.data;
+      let videoUrl = data?.video_url || data?.hd_video_url || data?.sd_video_url || data?.download_url;
+
+      if (videoUrl) {
+        console.log('✅ TikDownload success! Video URL found');
+        return res.json({
+          success: true,
+          video: {
+            id: Date.now().toString(),
+            caption: data.title || 'No caption',
+            author: data.author || 'Unknown',
+            hdUrl: videoUrl,
+            sdUrl: videoUrl,
+            duration: data.duration || '0:00',
+            uploadDate: data.date || 'Unknown',
+            stats: {
+              views: data.views || 0,
+              likes: data.likes || 0,
+              comments: data.comments || 0,
+              shares: data.shares || 0
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.log('❌ TikDownload failed:', e.message);
+    }
+
+    // ========================================
+    // API 4: TikTok oEmbed (Last resort - gives thumbnail)
+    // ========================================
+    try {
+      console.log('🔄 Trying TikTok oEmbed...');
+      const response = await axios.get('https://www.tiktok.com/oembed', {
+        params: { url: url },
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      const data = response?.data;
+      if (data && data.thumbnail_url) {
+        // Try to get video URL from oEmbed response (sometimes available)
+        let videoUrl = data.video_url || data.thumbnail_url;
+        console.log('✅ TikTok oEmbed success! (thumbnail only)');
+        return res.json({
+          success: true,
+          video: {
+            id: Date.now().toString(),
+            caption: data.title || 'No caption',
+            author: data.author_name || 'Unknown',
+            hdUrl: videoUrl,
+            sdUrl: videoUrl,
+            duration: '0:00',
+            uploadDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
+            stats: {
+              views: 0,
+              likes: 0,
+              comments: 0,
+              shares: 0
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.log('❌ TikTok oEmbed failed:', e.message);
+    }
+
+    // ========================================
+    // If all APIs fail - Return the original URL
+    // ========================================
+    console.log('❌ All APIs failed. Returning original URL as fallback.');
     return res.json({
       success: true,
       video: {
         id: Date.now().toString(),
-        caption: 'Click the link below to watch the video on TikTok',
+        caption: 'Open this link to watch the video on TikTok',
         author: 'TikTok Video',
         hdUrl: url,
         sdUrl: url,
@@ -302,7 +359,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================
-// CATCH-ALL ROUTE (SPA Support)
+// CATCH-ALL ROUTE
 // ============================================
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
