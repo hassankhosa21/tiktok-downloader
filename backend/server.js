@@ -102,7 +102,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API (Using ssstik.io - WORKS 100%)
+// DOWNLOAD API (Using musicallydown.com)
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -117,80 +117,93 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
     console.log('📥 Downloading:', url);
 
     // ========================================
-    // API: ssstik.io (Works 100% - No API Key)
+    // API: musicallydown.com
     // ========================================
     try {
-      console.log('🔄 Trying ssstik.io...');
+      console.log('🔄 Trying musicallydown.com...');
       
-      const response = await axios.post('https://ssstik.io/abc?url=dl', 
+      // First, get the initial page to get the token
+      const response = await axios.get('https://musicallydown.com/', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5'
+        },
+        timeout: 15000
+      });
+
+      // Extract the token from the page
+      const html = response.data;
+      const tokenMatch = html.match(/name="_token"\s+value="([^"]+)"/);
+      const token = tokenMatch ? tokenMatch[1] : '';
+
+      if (!token) {
+        console.log('❌ Could not extract token from musicallydown.com');
+        throw new Error('Token extraction failed');
+      }
+
+      console.log('✅ Token extracted successfully');
+
+      // Now make the POST request to download
+      const downloadResponse = await axios.post(
+        'https://musicallydown.com/download',
         new URLSearchParams({
-          id: url,
-          locale: 'en'
+          _token: token,
+          url: url,
+          submit: ''
         }),
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://ssstik.io/',
-            'Origin': 'https://ssstik.io',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://musicallydown.com/',
+            'Origin': 'https://musicallydown.com'
           },
-          timeout: 30000
+          timeout: 25000
         }
       );
 
-      const data = response?.data;
+      const resultHtml = downloadResponse.data;
       
-      // Extract video URL from the response
+      // Extract video URL from the response HTML
+      // Try multiple patterns
       let videoUrl = null;
       let author = 'Unknown';
-      let title = 'No caption';
-      
-      if (data) {
-        // Try to find video URL in the response
-        if (data.url) {
-          videoUrl = data.url;
-        } else if (data.video_url) {
-          videoUrl = data.video_url;
-        } else if (data.hd_video_url) {
-          videoUrl = data.hd_video_url;
-        } else if (data.sd_video_url) {
-          videoUrl = data.sd_video_url;
-        } else if (data.download_url) {
-          videoUrl = data.download_url;
-        } else if (data.media && data.media.video_url) {
-          videoUrl = data.media.video_url;
-        }
-        
-        // Extract author and title
-        if (data.author) author = data.author;
-        else if (data.username) author = data.username;
-        else if (data.user && data.user.username) author = data.user.username;
-        
-        if (data.title) title = data.title;
-        else if (data.text) title = data.text;
-        else if (data.description) title = data.description;
+      let title = 'TikTok Video';
+
+      // Pattern 1: video tag src attribute
+      const videoSrcMatch = resultHtml.match(/<video[^>]+src="([^"]+\.mp4[^"]*)"[^>]*>/i);
+      if (videoSrcMatch) {
+        videoUrl = videoSrcMatch[1];
       }
 
-      // If we didn't find video URL in JSON, try to parse HTML
-      if (!videoUrl && typeof data === 'string') {
-        const htmlMatch = data.match(/https?:\/\/[^\s"'<>]+\.(mp4|mov|webm|avi)[^\s"']*/i);
-        if (htmlMatch) {
-          videoUrl = htmlMatch[0];
+      // Pattern 2: a tag with download link
+      if (!videoUrl) {
+        const downloadLinkMatch = resultHtml.match(/<a[^>]+href="([^"]+\.mp4[^"]*)"[^>]*>Download/i);
+        if (downloadLinkMatch) {
+          videoUrl = downloadLinkMatch[1];
         }
       }
+
+      // Pattern 3: any mp4 URL
+      if (!videoUrl) {
+        const mp4Match = resultHtml.match(/https?:\/\/[^\s"'<>]+\.mp4[^\s"']*/i);
+        if (mp4Match) {
+          videoUrl = mp4Match[0];
+        }
+      }
+
+      // Extract author and title
+      const authorMatch = resultHtml.match(/<div[^>]*class="[^"]*username[^"]*"[^>]*>([^<]+)<\/div>/i);
+      if (authorMatch) author = authorMatch[1].trim();
+
+      const titleMatch = resultHtml.match(/<div[^>]*class="[^"]*caption[^"]*"[^>]*>([^<]+)<\/div>/i);
+      if (titleMatch) title = titleMatch[1].trim();
 
       if (videoUrl) {
-        console.log('✅ ssstik.io success! Video URL found');
-        
-        // Check if URL needs to be cleaned
-        if (videoUrl.startsWith('//')) {
-          videoUrl = 'https:' + videoUrl;
-        }
-        
+        console.log('✅ musicallydown.com success!');
         return res.json({
           success: true,
           video: {
@@ -210,63 +223,15 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
           }
         });
       }
-      
-      console.log('❌ ssstik.io returned no video URL');
-      
+
+      console.log('❌ musicallydown.com returned no video URL');
+
     } catch (error) {
-      console.log('❌ ssstik.io failed:', error.message);
+      console.log('❌ musicallydown.com failed:', error.message);
     }
 
     // ========================================
-    // FALLBACK: Try snapinsta (Backup)
-    // ========================================
-    try {
-      console.log('🔄 Trying Snapinsta (Backup)...');
-      const response = await axios.get('https://api.snapinsta.app/action.php', {
-        params: { 
-          url: url, 
-          lang: 'en',
-          ajax: 1
-        },
-        timeout: 20000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://snapinsta.app/',
-          'Origin': 'https://snapinsta.app'
-        }
-      });
-
-      const data = response?.data;
-      let videoUrl = data?.video_url || data?.download_url || data?.hd_video_url || data?.sd_video_url;
-      
-      if (videoUrl) {
-        console.log('✅ Snapinsta success!');
-        return res.json({
-          success: true,
-          video: {
-            id: Date.now().toString(),
-            caption: data.title || 'TikTok Video',
-            author: data.author || 'Unknown',
-            hdUrl: videoUrl,
-            sdUrl: videoUrl,
-            duration: '0:00',
-            uploadDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
-            stats: {
-              views: 0,
-              likes: 0,
-              comments: 0,
-              shares: 0
-            }
-          }
-        });
-      }
-    } catch (e) {
-      console.log('❌ Snapinsta failed:', e.message);
-    }
-
-    // ========================================
-    // FINAL FALLBACK: Return Original URL
+    // FALLBACK: Return Original URL
     // ========================================
     console.log('❌ All APIs failed. Returning original URL.');
     return res.json({
