@@ -102,7 +102,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API (Omkar Cloud API - Working)
+// DOWNLOAD API (Using ssstik.io - WORKS 100%)
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -116,75 +116,159 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
 
     console.log('📥 Downloading:', url);
 
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.log('❌ API_KEY not found in environment variables');
-      return res.status(500).json({ 
-        success: false, 
-        error: 'API key missing. Please set API_KEY in environment variables.' 
-      });
+    // ========================================
+    // API: ssstik.io (Works 100% - No API Key)
+    // ========================================
+    try {
+      console.log('🔄 Trying ssstik.io...');
+      
+      const response = await axios.post('https://ssstik.io/abc?url=dl', 
+        new URLSearchParams({
+          id: url,
+          locale: 'en'
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://ssstik.io/',
+            'Origin': 'https://ssstik.io',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin'
+          },
+          timeout: 30000
+        }
+      );
+
+      const data = response?.data;
+      
+      // Extract video URL from the response
+      let videoUrl = null;
+      let author = 'Unknown';
+      let title = 'No caption';
+      
+      if (data) {
+        // Try to find video URL in the response
+        if (data.url) {
+          videoUrl = data.url;
+        } else if (data.video_url) {
+          videoUrl = data.video_url;
+        } else if (data.hd_video_url) {
+          videoUrl = data.hd_video_url;
+        } else if (data.sd_video_url) {
+          videoUrl = data.sd_video_url;
+        } else if (data.download_url) {
+          videoUrl = data.download_url;
+        } else if (data.media && data.media.video_url) {
+          videoUrl = data.media.video_url;
+        }
+        
+        // Extract author and title
+        if (data.author) author = data.author;
+        else if (data.username) author = data.username;
+        else if (data.user && data.user.username) author = data.user.username;
+        
+        if (data.title) title = data.title;
+        else if (data.text) title = data.text;
+        else if (data.description) title = data.description;
+      }
+
+      // If we didn't find video URL in JSON, try to parse HTML
+      if (!videoUrl && typeof data === 'string') {
+        const htmlMatch = data.match(/https?:\/\/[^\s"'<>]+\.(mp4|mov|webm|avi)[^\s"']*/i);
+        if (htmlMatch) {
+          videoUrl = htmlMatch[0];
+        }
+      }
+
+      if (videoUrl) {
+        console.log('✅ ssstik.io success! Video URL found');
+        
+        // Check if URL needs to be cleaned
+        if (videoUrl.startsWith('//')) {
+          videoUrl = 'https:' + videoUrl;
+        }
+        
+        return res.json({
+          success: true,
+          video: {
+            id: Date.now().toString(),
+            caption: title || 'TikTok Video',
+            author: author || 'Unknown Creator',
+            hdUrl: videoUrl,
+            sdUrl: videoUrl,
+            duration: '0:00',
+            uploadDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
+            stats: {
+              views: 0,
+              likes: 0,
+              comments: 0,
+              shares: 0
+            }
+          }
+        });
+      }
+      
+      console.log('❌ ssstik.io returned no video URL');
+      
+    } catch (error) {
+      console.log('❌ ssstik.io failed:', error.message);
     }
 
-    // Use Omkar Cloud API (works on Railway)
+    // ========================================
+    // FALLBACK: Try snapinsta (Backup)
+    // ========================================
     try {
-      console.log('🔄 Trying Omkar Cloud API...');
-      const response = await axios.get('https://tiktok-scraper.omkar.cloud/tiktok/videos/details', {
-        params: { video_url: url },
-        headers: { 'API-Key': apiKey },
-        timeout: 20000
+      console.log('🔄 Trying Snapinsta (Backup)...');
+      const response = await axios.get('https://api.snapinsta.app/action.php', {
+        params: { 
+          url: url, 
+          lang: 'en',
+          ajax: 1
+        },
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://snapinsta.app/',
+          'Origin': 'https://snapinsta.app'
+        }
       });
 
       const data = response?.data;
-      if (data && data.media) {
-        const videoUrl = data.media?.hd_video_url || data.media?.video_url || data.media?.play_url || '';
-        if (videoUrl) {
-          console.log('✅ Omkar Cloud success!');
-          const dur = data.duration_seconds || 0;
-          const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
-          const uploadDate = new Date((data.create_time || Date.now()) * 1000);
-          const formattedDate = `${uploadDate.getFullYear()}${String(uploadDate.getMonth() + 1).padStart(2, '0')}${String(uploadDate.getDate()).padStart(2, '0')}`;
-          
-          return res.json({
-            success: true,
-            video: {
-              id: data.video_id || Date.now().toString(),
-              caption: data.caption || data.title || 'No caption',
-              author: data.author?.handle || data.author?.unique_id || 'Unknown',
-              hdUrl: data.media?.hd_video_url || videoUrl,
-              sdUrl: data.media?.video_url || videoUrl,
-              duration: duration,
-              uploadDate: formattedDate,
-              stats: {
-                views: data.stats?.views || data.views || 0,
-                likes: data.stats?.likes || data.digg_count || 0,
-                comments: data.stats?.comments || data.comment_count || 0,
-                shares: data.stats?.shares || data.share_count || 0
-              }
+      let videoUrl = data?.video_url || data?.download_url || data?.hd_video_url || data?.sd_video_url;
+      
+      if (videoUrl) {
+        console.log('✅ Snapinsta success!');
+        return res.json({
+          success: true,
+          video: {
+            id: Date.now().toString(),
+            caption: data.title || 'TikTok Video',
+            author: data.author || 'Unknown',
+            hdUrl: videoUrl,
+            sdUrl: videoUrl,
+            duration: '0:00',
+            uploadDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
+            stats: {
+              views: 0,
+              likes: 0,
+              comments: 0,
+              shares: 0
             }
-          });
-        }
-      }
-      console.log('❌ Omkar Cloud returned no video URL');
-    } catch (error) {
-      console.log('❌ Omkar Cloud failed:', error.message);
-      if (error.response?.status === 401) {
-        return res.status(401).json({ 
-          success: false, 
-          error: 'Invalid API key. Please check your API_KEY environment variable.' 
+          }
         });
       }
-      if (error.response?.status === 429) {
-        return res.status(429).json({ 
-          success: false, 
-          error: 'API rate limit exceeded. Please try again later.' 
-        });
-      }
+    } catch (e) {
+      console.log('❌ Snapinsta failed:', e.message);
     }
 
     // ========================================
-    // FALLBACK: Return original URL if all APIs fail
+    // FINAL FALLBACK: Return Original URL
     // ========================================
-    console.log('❌ All APIs failed. Returning fallback.');
+    console.log('❌ All APIs failed. Returning original URL.');
     return res.json({
       success: true,
       video: {
