@@ -17,7 +17,7 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// ✅ Simple memory store (works fine for free tier)
+// Simple memory store (works fine for free tier)
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
@@ -106,7 +106,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API
+// DOWNLOAD API (TikWM Only – No API Key Needed)
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -118,96 +118,49 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid TikTok URL' });
     }
 
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ success: false, error: 'API key missing' });
-    }
-
-    // Try Omkar Cloud API
-    const response = await axios.get('https://tiktok-scraper.omkar.cloud/tiktok/videos/details', {
-      params: { video_url: url },
-      headers: { 'API-Key': apiKey },
-      timeout: 15000
+    console.log('📥 Downloading:', url);
+    const response = await axios.get('https://api.tikwm.com/video/', {
+      params: { 
+        url: url,
+        hd: 1,
+        web: 1
+      },
+      timeout: 20000
     });
 
-    const data = response?.data;
-    if (!data?.media) {
+    const data = response?.data?.data;
+    if (!data) {
       return res.status(404).json({ success: false, error: 'Video not found' });
     }
 
-    const uploadDate = new Date((data.create_time || Date.now()) * 1000);
-    const formattedDate = `${uploadDate.getFullYear()}${String(uploadDate.getMonth() + 1).padStart(2, '0')}${String(uploadDate.getDate()).padStart(2, '0')}`;
-    const dur = data.duration_seconds || 0;
+    const dur = data.duration || 0;
     const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
 
     res.json({
       success: true,
       video: {
         id: data.video_id || '',
-        caption: data.caption || 'No caption',
-        author: data.author?.handle || 'Unknown',
-        hdUrl: data.media?.hd_video_url || data.media?.video_url || '',
-        sdUrl: data.media?.video_url || data.media?.hd_video_url || '',
-        duration,
-        uploadDate: formattedDate,
+        caption: data.title || 'No caption',
+        author: data.author?.unique_id || 'Unknown',
+        hdUrl: data.hd_video_url || data.video_url || '',
+        sdUrl: data.video_url || data.hd_video_url || '',
+        duration: duration,
+        uploadDate: data.create_time || 'Unknown',
         stats: {
-          views: data.stats?.views || 0,
-          likes: data.stats?.likes || 0,
-          comments: data.stats?.comments || 0,
-          shares: data.stats?.shares || 0
+          views: data.views || 0,
+          likes: data.digg_count || 0,
+          comments: data.comment_count || 0,
+          shares: data.share_count || 0
         }
       }
     });
 
   } catch (error) {
-    console.error('Download error (Omkar API):', error.message);
-    
-    // Try fallback API (TikWM)
-    try {
-      console.log('🔄 Trying fallback API (TikWM)...');
-      const fallbackResponse = await axios.get('https://api.tikwm.com/video/', {
-        params: { 
-          url: req.query.url,
-          hd: 1,
-          web: 1
-        },
-        timeout: 15000
-      });
-
-      const fallbackData = fallbackResponse?.data?.data;
-      if (!fallbackData) {
-        throw new Error('No data from fallback API');
-      }
-
-      const dur2 = fallbackData.duration || 0;
-      const duration2 = `${Math.floor(dur2 / 60)}:${String(dur2 % 60).padStart(2, '0')}`;
-
-      res.json({
-        success: true,
-        video: {
-          id: fallbackData.video_id || '',
-          caption: fallbackData.title || 'No caption',
-          author: fallbackData.author?.unique_id || 'Unknown',
-          hdUrl: fallbackData.hd_video_url || fallbackData.video_url || '',
-          sdUrl: fallbackData.video_url || fallbackData.hd_video_url || '',
-          duration: duration2,
-          uploadDate: fallbackData.create_time || 'Unknown',
-          stats: {
-            views: fallbackData.views || 0,
-            likes: fallbackData.digg_count || 0,
-            comments: fallbackData.comment_count || 0,
-            shares: fallbackData.share_count || 0
-          }
-        }
-      });
-
-    } catch (fallbackError) {
-      console.error('Fallback API failed:', fallbackError.message);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to download video. Please try again.' 
-      });
-    }
+    console.error('Download error:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to download video. Please try again.' 
+    });
   }
 });
 
