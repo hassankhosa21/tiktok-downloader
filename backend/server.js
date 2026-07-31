@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo').default || require('connect-mongo');
 const path = require('node:path');
 const { initializeDatabase, createUser, verifyUser } = require('./database');
 
