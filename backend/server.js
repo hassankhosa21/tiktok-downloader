@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo')(session);
 const path = require('node:path');
 const { initializeDatabase, createUser, verifyUser } = require('./database');
 
@@ -11,7 +11,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Railway sits in front of your app behind a proxy that terminates HTTPS.
-// Without this, secure cookies won't be set/read correctly in production.
 app.set('trust proxy', 1);
 
 app.disable('x-powered-by');
@@ -19,13 +18,13 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// ✅ MongoDB session store (properly imported)
+// ✅ FIXED: MongoDB session store
 const mongoUrl = process.env.MONGODB_URI;
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ 
+  store: new MongoStore({ 
     mongoUrl: mongoUrl,
     collectionName: 'sessions',
     ttl: 24 * 60 * 60 // 1 day
@@ -51,7 +50,6 @@ app.use(session({
 // AUTH ROUTES
 // ============================================
 
-// Check if user is logged in
 app.get('/api/auth/me', (req, res) => {
   if (req.session.user) {
     return res.json({ loggedIn: true, user: req.session.user });
@@ -59,7 +57,6 @@ app.get('/api/auth/me', (req, res) => {
   res.json({ loggedIn: false });
 });
 
-// Register
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -80,7 +77,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -99,7 +95,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Logout
 app.post('/api/auth/logout', (req, res) => {
   req.session.destroy(err => {
     if (err) {
@@ -110,9 +105,6 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
-// ============================================
-// AUTHENTICATION MIDDLEWARE
-// ============================================
 function isAuthenticated(req, res, next) {
   if (req.session?.user) {
     return next();
@@ -121,7 +113,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API (Primary: Omkar Cloud)
+// DOWNLOAD API
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -138,7 +130,7 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
       return res.status(500).json({ success: false, error: 'API key missing' });
     }
 
-    // Try Omkar Cloud API first
+    // Try Omkar Cloud API
     const response = await axios.get('https://tiktok-scraper.omkar.cloud/tiktok/videos/details', {
       params: { video_url: url },
       headers: { 'API-Key': apiKey },
@@ -150,7 +142,6 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Video not found' });
     }
 
-    // Format response
     const uploadDate = new Date((data.create_time || Date.now()) * 1000);
     const formattedDate = `${uploadDate.getFullYear()}${String(uploadDate.getMonth() + 1).padStart(2, '0')}${String(uploadDate.getDate()).padStart(2, '0')}`;
     const dur = data.duration_seconds || 0;
@@ -176,9 +167,9 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Download error (Omkar API):', error.message);
+    console.error('Download error:', error.message);
     
-    // If Omkar Cloud fails, try fallback API (TikWM)
+    // Try fallback API (TikWM)
     try {
       console.log('🔄 Trying fallback API (TikWM)...');
       const fallbackResponse = await axios.get('https://api.tikwm.com/video/', {
@@ -218,7 +209,7 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
       });
 
     } catch (fallbackError) {
-      console.error('Fallback API also failed:', fallbackError.message);
+      console.error('Fallback API failed:', fallbackError.message);
       res.status(500).json({ 
         success: false, 
         error: 'Failed to download video. Please try again.' 
