@@ -9,28 +9,24 @@ const { initializeDatabase, createUser, verifyUser } = require('./database');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Railway sits in front of your app behind a proxy that terminates HTTPS.
 app.set('trust proxy', 1);
-
 app.disable('x-powered-by');
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// Simple memory store (works fine for free tier)
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-    secure: process.env.NODE_ENV === 'production', 
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
-// Initialize database
-(async () => { 
+(async () => {
   try {
     await initializeDatabase();
     console.log('✅ Database initialized');
@@ -106,7 +102,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API (TikWM with User-Agent)
+// DOWNLOAD API (4 APIs with Fallback)
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -114,77 +110,19 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
     if (!url) {
       return res.status(400).json({ success: false, error: 'URL required' });
     }
-    if (!url.includes('tiktok.com')) {
+    if (!url.includes('tiktok.com') && !url.includes('vm.tiktok.com')) {
       return res.status(400).json({ success: false, error: 'Invalid TikTok URL' });
     }
 
     console.log('📥 Downloading:', url);
 
-    // Try TikWM API with proper headers
-    const response = await axios.get('https://www.tikwm.com/api/', {
-      params: { 
-        url: url,
-        hd: 1,
-        web: 1
-      },
-      timeout: 20000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.tikwm.com/',
-        'Origin': 'https://www.tikwm.com'
-      }
-    });
-
-    const data = response?.data?.data;
-    if (!data) {
-      return res.status(404).json({ success: false, error: 'Video not found' });
-    }
-
-    const dur = data.duration || 0;
-    const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
-
-    // Format upload date if it's a timestamp
-    let uploadDate = data.create_time || 'Unknown';
-    if (typeof uploadDate === 'number' || !isNaN(uploadDate)) {
-      const date = new Date(Number(uploadDate) * 1000);
-      if (!isNaN(date.getTime())) {
-        uploadDate = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-      }
-    }
-
-    res.json({
-      success: true,
-      video: {
-        id: data.video_id || '',
-        caption: data.title || 'No caption',
-        author: data.author?.unique_id || data.author?.nickname || 'Unknown',
-        hdUrl: data.hd_video_url || data.video_url || '',
-        sdUrl: data.video_url || data.hd_video_url || '',
-        duration: duration,
-        uploadDate: uploadDate,
-        stats: {
-          views: data.views || 0,
-          likes: data.digg_count || 0,
-          comments: data.comment_count || 0,
-          shares: data.share_count || 0
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Download error:', error.message);
-    
-    // Try fallback API (snaptik)
+    // =====================
+    // API 1: Snaptik
+    // =====================
     try {
-      console.log('🔄 Trying fallback API (Snaptik)...');
-      
-      const fallbackResponse = await axios.get('https://snaptik.app/api/ajaxSearch', {
-        params: { 
-          q: req.query.url,
-          lang: 'en'
-        },
+      console.log('🔄 Trying Snaptik...');
+      const response = await axios.get('https://snaptik.app/api/ajaxSearch', {
+        params: { q: url, lang: 'en' },
         timeout: 20000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -194,40 +132,181 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
         }
       });
 
-      const fallbackData = fallbackResponse?.data?.data;
-      if (!fallbackData || !fallbackData.video_url) {
-        throw new Error('No data from fallback API');
-      }
-
-      const dur2 = fallbackData.duration || 0;
-      const duration2 = `${Math.floor(dur2 / 60)}:${String(dur2 % 60).padStart(2, '0')}`;
-
-      res.json({
-        success: true,
-        video: {
-          id: fallbackData.video_id || '',
-          caption: fallbackData.title || 'No caption',
-          author: fallbackData.author || 'Unknown',
-          hdUrl: fallbackData.video_url || '',
-          sdUrl: fallbackData.video_url || '',
-          duration: duration2,
-          uploadDate: fallbackData.create_time || 'Unknown',
-          stats: {
-            views: fallbackData.views || 0,
-            likes: fallbackData.likes || 0,
-            comments: fallbackData.comments || 0,
-            shares: fallbackData.shares || 0
+      const data = response?.data?.data;
+      if (data && data.video_url) {
+        console.log('✅ Snaptik success!');
+        const dur = data.duration || 0;
+        const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
+        return res.json({
+          success: true,
+          video: {
+            id: data.video_id || Date.now().toString(),
+            caption: data.title || 'No caption',
+            author: data.author || 'Unknown',
+            hdUrl: data.video_url || '',
+            sdUrl: data.video_url || '',
+            duration: duration,
+            uploadDate: data.create_time || 'Unknown',
+            stats: {
+              views: data.views || 0,
+              likes: data.likes || 0,
+              comments: data.comments || 0,
+              shares: data.shares || 0
+            }
           }
+        });
+      }
+    } catch (e) {
+      console.log('❌ Snaptik failed:', e.message);
+    }
+
+    // =====================
+    // API 2: TikWM
+    // =====================
+    try {
+      console.log('🔄 Trying TikWM...');
+      const response = await axios.get('https://www.tikwm.com/api/', {
+        params: { url: url, hd: 1, web: 1 },
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://www.tikwm.com/',
+          'Origin': 'https://www.tikwm.com'
         }
       });
 
-    } catch (fallbackError) {
-      console.error('Fallback API failed:', fallbackError.message);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to download video. Please try again.' 
-      });
+      const data = response?.data?.data;
+      if (data && (data.hd_video_url || data.video_url)) {
+        console.log('✅ TikWM success!');
+        const dur = data.duration || 0;
+        const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
+        let uploadDate = data.create_time || 'Unknown';
+        if (typeof uploadDate === 'number') {
+          const date = new Date(uploadDate * 1000);
+          uploadDate = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+        }
+        return res.json({
+          success: true,
+          video: {
+            id: data.video_id || Date.now().toString(),
+            caption: data.title || 'No caption',
+            author: data.author?.unique_id || data.author || 'Unknown',
+            hdUrl: data.hd_video_url || data.video_url || '',
+            sdUrl: data.video_url || data.hd_video_url || '',
+            duration: duration,
+            uploadDate: uploadDate,
+            stats: {
+              views: data.views || 0,
+              likes: data.digg_count || 0,
+              comments: data.comment_count || 0,
+              shares: data.share_count || 0
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.log('❌ TikWM failed:', e.message);
     }
+
+    // =====================
+    // API 3: TikDownload
+    // =====================
+    try {
+      console.log('🔄 Trying TikDownload...');
+      const response = await axios.get('https://tikdownload.com/action.php', {
+        params: { url: url, ajax: 1 },
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://tikdownload.com/'
+        }
+      });
+
+      const data = response?.data;
+      if (data && data.video_url) {
+        console.log('✅ TikDownload success!');
+        return res.json({
+          success: true,
+          video: {
+            id: Date.now().toString(),
+            caption: data.title || 'No caption',
+            author: data.author || 'Unknown',
+            hdUrl: data.video_url || '',
+            sdUrl: data.video_url || '',
+            duration: data.duration || '0:00',
+            uploadDate: data.date || 'Unknown',
+            stats: {
+              views: data.views || 0,
+              likes: data.likes || 0,
+              comments: data.comments || 0,
+              shares: data.shares || 0
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.log('❌ TikDownload failed:', e.message);
+    }
+
+    // =====================
+    // API 4: ssstiktok (Backup)
+    // =====================
+    try {
+      console.log('🔄 Trying ssstiktok...');
+      const response = await axios.get('https://ssstiktok.io/api/v1/download', {
+        params: { url: url },
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://ssstiktok.io/',
+          'Origin': 'https://ssstiktok.io'
+        }
+      });
+
+      const data = response?.data;
+      if (data && data.video_url) {
+        console.log('✅ ssstiktok success!');
+        return res.json({
+          success: true,
+          video: {
+            id: Date.now().toString(),
+            caption: data.title || 'No caption',
+            author: data.author || 'Unknown',
+            hdUrl: data.video_url || '',
+            sdUrl: data.video_url || '',
+            duration: data.duration || '0:00',
+            uploadDate: data.date || 'Unknown',
+            stats: {
+              views: data.views || 0,
+              likes: data.likes || 0,
+              comments: data.comments || 0,
+              shares: data.shares || 0
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.log('❌ ssstiktok failed:', e.message);
+    }
+
+    // =====================
+    // If all APIs fail
+    // =====================
+    console.log('❌ All APIs failed for URL:', url);
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to download this video. Please try a different URL.'
+    });
+
+  } catch (error) {
+    console.error('Download error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Something went wrong. Please try again.'
+    });
   }
 });
 
@@ -235,8 +314,8 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
 // HEALTH CHECK
 // ============================================
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'Hassan Labs TikTok Downloader is running!',
     environment: process.env.NODE_ENV || 'development'
   });
