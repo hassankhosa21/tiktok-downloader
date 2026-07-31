@@ -102,7 +102,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ============================================
-// DOWNLOAD API (FIXED - Proper Video URL)
+// DOWNLOAD API (Omkar Cloud API - Working)
 // ============================================
 app.get('/api/download', isAuthenticated, async (req, res) => {
   try {
@@ -116,214 +116,80 @@ app.get('/api/download', isAuthenticated, async (req, res) => {
 
     console.log('📥 Downloading:', url);
 
-    // ========================================
-    // API 1: Snaptik (Best for video download)
-    // ========================================
-    try {
-      console.log('🔄 Trying Snaptik...');
-      const response = await axios.get('https://snaptik.app/api/ajaxSearch', {
-        params: { q: url, lang: 'en' },
-        timeout: 25000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
-          'Referer': 'https://snaptik.app/',
-          'Origin': 'https://snaptik.app'
-        }
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.log('❌ API_KEY not found in environment variables');
+      return res.status(500).json({ 
+        success: false, 
+        error: 'API key missing. Please set API_KEY in environment variables.' 
       });
-
-      const data = response?.data?.data;
-      
-      // ✅ Check for video_url in multiple possible locations
-      let videoUrl = null;
-      if (data) {
-        videoUrl = data.video_url || data.video || data.download_url || data.hd_video_url || data.sd_video_url;
-        // Also check nested objects
-        if (!videoUrl && data.media) {
-          videoUrl = data.media.video_url || data.media.hd_video_url || data.media.sd_video_url;
-        }
-        if (!videoUrl && data.video) {
-          videoUrl = data.video.video_url || data.video.hd_video_url || data.video.sd_video_url;
-        }
-      }
-
-      if (videoUrl) {
-        console.log('✅ Snaptik success! Video URL found:', videoUrl.substring(0, 50) + '...');
-        const dur = data.duration || 0;
-        const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
-        return res.json({
-          success: true,
-          video: {
-            id: data.video_id || Date.now().toString(),
-            caption: data.title || 'No caption',
-            author: data.author || 'Unknown',
-            hdUrl: videoUrl,
-            sdUrl: videoUrl,
-            duration: duration,
-            uploadDate: data.create_time || 'Unknown',
-            stats: {
-              views: data.views || 0,
-              likes: data.likes || 0,
-              comments: data.comments || 0,
-              shares: data.shares || 0
-            }
-          }
-        });
-      }
-    } catch (e) {
-      console.log('❌ Snaptik failed:', e.message);
     }
 
-    // ========================================
-    // API 2: TikWM (Backup)
-    // ========================================
+    // Use Omkar Cloud API (works on Railway)
     try {
-      console.log('🔄 Trying TikWM...');
-      const response = await axios.get('https://www.tikwm.com/api/', {
-        params: { url: url, hd: 1, web: 1 },
-        timeout: 20000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://www.tikwm.com/',
-          'Origin': 'https://www.tikwm.com'
-        }
-      });
-
-      const data = response?.data?.data;
-      let videoUrl = null;
-      if (data) {
-        videoUrl = data.hd_video_url || data.video_url || data.download_url || data.play_url;
-        if (!videoUrl && data.video) {
-          videoUrl = data.video.hd_video_url || data.video.video_url || data.video.play_url;
-        }
-      }
-
-      if (videoUrl) {
-        console.log('✅ TikWM success! Video URL found:', videoUrl.substring(0, 50) + '...');
-        const dur = data.duration || 0;
-        const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
-        let uploadDate = data.create_time || 'Unknown';
-        if (typeof uploadDate === 'number') {
-          const date = new Date(uploadDate * 1000);
-          uploadDate = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-        }
-        return res.json({
-          success: true,
-          video: {
-            id: data.video_id || Date.now().toString(),
-            caption: data.title || 'No caption',
-            author: data.author?.unique_id || data.author || 'Unknown',
-            hdUrl: videoUrl,
-            sdUrl: data.video_url || videoUrl,
-            duration: duration,
-            uploadDate: uploadDate,
-            stats: {
-              views: data.views || 0,
-              likes: data.digg_count || 0,
-              comments: data.comment_count || 0,
-              shares: data.share_count || 0
-            }
-          }
-        });
-      }
-    } catch (e) {
-      console.log('❌ TikWM failed:', e.message);
-    }
-
-    // ========================================
-    // API 3: TikTok Downloader (Alternative)
-    // ========================================
-    try {
-      console.log('🔄 Trying TikDownload...');
-      const response = await axios.get('https://tikdownload.com/action.php', {
-        params: { url: url, ajax: 1 },
-        timeout: 20000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://tikdownload.com/'
-        }
+      console.log('🔄 Trying Omkar Cloud API...');
+      const response = await axios.get('https://tiktok-scraper.omkar.cloud/tiktok/videos/details', {
+        params: { video_url: url },
+        headers: { 'API-Key': apiKey },
+        timeout: 20000
       });
 
       const data = response?.data;
-      let videoUrl = data?.video_url || data?.hd_video_url || data?.sd_video_url || data?.download_url;
-
-      if (videoUrl) {
-        console.log('✅ TikDownload success! Video URL found');
-        return res.json({
-          success: true,
-          video: {
-            id: Date.now().toString(),
-            caption: data.title || 'No caption',
-            author: data.author || 'Unknown',
-            hdUrl: videoUrl,
-            sdUrl: videoUrl,
-            duration: data.duration || '0:00',
-            uploadDate: data.date || 'Unknown',
-            stats: {
-              views: data.views || 0,
-              likes: data.likes || 0,
-              comments: data.comments || 0,
-              shares: data.shares || 0
+      if (data && data.media) {
+        const videoUrl = data.media?.hd_video_url || data.media?.video_url || data.media?.play_url || '';
+        if (videoUrl) {
+          console.log('✅ Omkar Cloud success!');
+          const dur = data.duration_seconds || 0;
+          const duration = `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`;
+          const uploadDate = new Date((data.create_time || Date.now()) * 1000);
+          const formattedDate = `${uploadDate.getFullYear()}${String(uploadDate.getMonth() + 1).padStart(2, '0')}${String(uploadDate.getDate()).padStart(2, '0')}`;
+          
+          return res.json({
+            success: true,
+            video: {
+              id: data.video_id || Date.now().toString(),
+              caption: data.caption || data.title || 'No caption',
+              author: data.author?.handle || data.author?.unique_id || 'Unknown',
+              hdUrl: data.media?.hd_video_url || videoUrl,
+              sdUrl: data.media?.video_url || videoUrl,
+              duration: duration,
+              uploadDate: formattedDate,
+              stats: {
+                views: data.stats?.views || data.views || 0,
+                likes: data.stats?.likes || data.digg_count || 0,
+                comments: data.stats?.comments || data.comment_count || 0,
+                shares: data.stats?.shares || data.share_count || 0
+              }
             }
-          }
-        });
-      }
-    } catch (e) {
-      console.log('❌ TikDownload failed:', e.message);
-    }
-
-    // ========================================
-    // API 4: TikTok oEmbed (Last resort - gives thumbnail)
-    // ========================================
-    try {
-      console.log('🔄 Trying TikTok oEmbed...');
-      const response = await axios.get('https://www.tiktok.com/oembed', {
-        params: { url: url },
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          });
         }
-      });
-
-      const data = response?.data;
-      if (data && data.thumbnail_url) {
-        // Try to get video URL from oEmbed response (sometimes available)
-        let videoUrl = data.video_url || data.thumbnail_url;
-        console.log('✅ TikTok oEmbed success! (thumbnail only)');
-        return res.json({
-          success: true,
-          video: {
-            id: Date.now().toString(),
-            caption: data.title || 'No caption',
-            author: data.author_name || 'Unknown',
-            hdUrl: videoUrl,
-            sdUrl: videoUrl,
-            duration: '0:00',
-            uploadDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
-            stats: {
-              views: 0,
-              likes: 0,
-              comments: 0,
-              shares: 0
-            }
-          }
+      }
+      console.log('❌ Omkar Cloud returned no video URL');
+    } catch (error) {
+      console.log('❌ Omkar Cloud failed:', error.message);
+      if (error.response?.status === 401) {
+        return res.status(401).json({ 
+          success: false, 
+          error: 'Invalid API key. Please check your API_KEY environment variable.' 
         });
       }
-    } catch (e) {
-      console.log('❌ TikTok oEmbed failed:', e.message);
+      if (error.response?.status === 429) {
+        return res.status(429).json({ 
+          success: false, 
+          error: 'API rate limit exceeded. Please try again later.' 
+        });
+      }
     }
 
     // ========================================
-    // If all APIs fail - Return the original URL
+    // FALLBACK: Return original URL if all APIs fail
     // ========================================
-    console.log('❌ All APIs failed. Returning original URL as fallback.');
+    console.log('❌ All APIs failed. Returning fallback.');
     return res.json({
       success: true,
       video: {
         id: Date.now().toString(),
-        caption: 'Open this link to watch the video on TikTok',
+        caption: 'Click the link below to watch the video on TikTok',
         author: 'TikTok Video',
         hdUrl: url,
         sdUrl: url,
